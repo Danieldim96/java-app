@@ -1,10 +1,15 @@
+package org;
+
+import org.model.*;
+import org.service.Store;
+import org.util.InsufficientQuantityException;
+
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
 
 public class Main {
     public static void main(String[] args) {
-        // Create a store with specific markup and expiration settings
         Store store = new Store(
             20.0,  // 20% markup for food
             30.0,  // 30% markup for non-food
@@ -24,13 +29,11 @@ public class Main {
         store.addProduct(bread);
         store.addProduct(soap);
 
-        // Add a cashier
         Cashier cashier = new Cashier(1, "John Doe", 1500.0);
         store.addCashier(cashier);
         store.assignCashierToRegister(cashier, 1);
 
         try {
-            // Create a sale
             Map<Integer, Integer> purchase = new HashMap<>();
             purchase.put(1, 2);  // 2 units of milk
             purchase.put(2, 1);  // 1 unit of bread

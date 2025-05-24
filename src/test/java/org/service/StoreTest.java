@@ -1,6 +1,12 @@
+package org.service;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
+
+import org.model.*;
+import org.util.InsufficientQuantityException;
+
 import java.io.File;
 import java.time.LocalDate;
 import java.util.HashMap;
@@ -96,7 +102,7 @@ public class StoreTest {
         store.assignCashierToRegister(newCashier, 2);
 
         assertThrows(IllegalStateException.class, () -> {
-            store.assignCashierToRegister(cashier, 2); // Try to assign to already assigned register
+            store.assignCashierToRegister(cashier, 2);
         });
     }
 
@@ -108,7 +114,7 @@ public class StoreTest {
         Map<Integer, Integer> purchase2 = new HashMap<>();
         purchase2.put(2, 1);
         store.createSale(1, purchase2);
-        assertEquals(4, store.getTotalReceipts()); // 1 from previous testCreateSale + 2 here + 1 from serialization test
+        assertEquals(4, store.getTotalReceipts());
         assertTrue(store.getTotalRevenue() > 0);
     }
 
@@ -117,7 +123,7 @@ public class StoreTest {
         Map<Integer, Integer> purchase = new HashMap<>();
         purchase.put(1, 1);
         Receipt receipt = store.createSale(1, purchase);
-        String serFile = "receipt_" + receipt.getReceiptNumber() + ".ser";
+        String serFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".ser";
         Receipt deserialized = Receipt.deserializeFromFile(serFile);
         assertEquals(receipt.getReceiptNumber(), deserialized.getReceiptNumber());
         assertEquals(receipt.generateReceiptText(), deserialized.generateReceiptText());
@@ -130,7 +136,7 @@ public class StoreTest {
         Map<Integer, Integer> purchase = new HashMap<>();
         purchase.put(1, 1);
         Receipt receipt = store.createSale(1, purchase);
-        String txtFile = "receipt_" + receipt.getReceiptNumber() + ".txt";
+        String txtFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".txt";
         String fileText = Receipt.readReceiptTextFromFile(txtFile);
         assertTrue(fileText.contains("Receipt #" + receipt.getReceiptNumber()));
         // Clean up

@@ -1,10 +1,21 @@
+package org.service;
+
+import org.model.*;
+import org.util.InsufficientQuantityException;
+
+import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.time.LocalDate;
 import java.util.*;
 
 public class Store {
-    private Map<Integer, Product> products; // delivered products
+    private static final String OUTPUT_DIR = "output/receipts";
+    
+    private Map<Integer, Product> products;
     private List<Product> soldProducts;
     private List<Cashier> cashiers;
     private Map<Integer, Cashier> registerAssignments;
@@ -25,6 +36,8 @@ public class Store {
         this.nonFoodMarkupPercentage = nonFoodMarkupPercentage;
         this.expirationDaysThreshold = expirationDaysThreshold;
         this.expirationDiscountPercentage = expirationDiscountPercentage;
+        
+        createOutputDirectory();
     }
 
     public void addProduct(Product product) {
@@ -93,8 +106,19 @@ public class Store {
         return receipt;
     }
 
+    private void createOutputDirectory() {
+        try {
+            Path outputPath = Paths.get(OUTPUT_DIR);
+            if (!Files.exists(outputPath)) {
+                Files.createDirectories(outputPath);
+            }
+        } catch (IOException e) {
+            System.err.println("Error creating output directory: " + e.getMessage());
+        }
+    }
+
     private void saveReceiptToFile(Receipt receipt) {
-        String fileName = "receipt_" + receipt.getReceiptNumber() + ".txt";
+        String fileName = OUTPUT_DIR + File.separator + "receipt_" + receipt.getReceiptNumber() + ".txt";
         try (FileWriter writer = new FileWriter(fileName)) {
             writer.write(receipt.generateReceiptText());
         } catch (IOException e) {
@@ -103,7 +127,7 @@ public class Store {
     }
 
     private void saveReceiptSerialized(Receipt receipt) {
-        String fileName = "receipt_" + receipt.getReceiptNumber() + ".ser";
+        String fileName = OUTPUT_DIR + File.separator + "receipt_" + receipt.getReceiptNumber() + ".ser";
         try {
             receipt.serializeToFile(fileName);
         } catch (IOException e) {
