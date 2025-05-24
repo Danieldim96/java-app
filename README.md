@@ -64,26 +64,43 @@ To run the tests:
 
 ## Project Structure
 
-- `src/main/java/` - Main source code
-  - `Product.java` - Product class with expiration date management
-  - `ProductCategory.java` - Product category enum (FOOD/NON_FOOD)
-  - `Cashier.java` - Cashier class with register assignment
-  - `Store.java` - Main store management class
-  - `Receipt.java` - Receipt generation and serialization
-  - `Main.java` - Application entry point
-- `src/test/java/` - Test source code
-  - `StoreTest.java` - Test cases for the store system
-- `build.gradle` - Gradle build configuration
-- `gradle/` - Gradle wrapper files
-- `gradlew` / `gradlew.bat` - Gradle wrapper scripts
+```
+src/
+├── main/
+│   ├── java/
+│   │   └── org/
+│   │       ├── Main.java - Application entry point
+│   │       ├── model/
+│   │       │   ├── Cashier.java - Cashier class with register assignment
+│   │       │   ├── Product.java - Product class with expiration date management
+│   │       │   ├── ProductCategory.java - Product category enum (FOOD/NON_FOOD)
+│   │       │   └── Receipt.java - Receipt generation and serialization
+│   │       ├── service/
+│   │       │   └── Store.java - Main store management class
+│   │       └── util/
+│   │           └── InsufficientQuantityException.java - Custom exception for stock management
+│   └── resources/ - Resource files
+└── test/
+    └── java/
+        └── org/
+            └── service/
+                └── StoreTest.java - Test cases for the store system
+
+build.gradle - Gradle build configuration
+gradle/ - Gradle wrapper files
+gradlew / gradlew.bat - Gradle wrapper scripts
+output/receipts/ - Generated receipt files (gitignored)
+README.md - This file
+```
 
 ## Features in Detail
 
 ### Receipt Management
-- Receipts are saved in two formats:
+- Receipts are saved in two formats in the `output/receipts/` directory:
   - Text files (`receipt_N.txt`) for human-readable format
   - Serialized files (`receipt_N.ser`) for object persistence
 - Receipts can be deserialized and read from files
+- The output directory is automatically created if it doesn't exist
 - Each receipt contains:
   - Unique receipt number
   - Date and time
@@ -125,7 +142,7 @@ The `Main` class contains an example of how to use the system:
 4. Process sales and generate receipts
 5. View financial reports (expenses, income, profit)
 
-Receipts are automatically saved to files in the project directory with names like `receipt_1.txt` and `receipt_1.ser`.
+Receipts are automatically saved to files in the `output/receipts/` directory with names like `receipt_1.txt` and `receipt_1.ser`. The output directory is gitignored to keep generated files out of version control.
 
 ## Development
 

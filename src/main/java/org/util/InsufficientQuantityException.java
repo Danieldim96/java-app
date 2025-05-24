@@ -1,3 +1,7 @@
+package org.util;
+
+import org.model.Product;
+
 public class InsufficientQuantityException extends Exception {
     private Product product;
     private int requestedQuantity;

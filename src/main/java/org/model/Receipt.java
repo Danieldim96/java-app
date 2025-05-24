@@ -1,3 +1,5 @@
+package org.model;
+
 import java.io.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;

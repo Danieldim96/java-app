@@ -1,3 +1,5 @@
+package org.model;
+
 import java.io.Serializable;
 
 public class Cashier implements Serializable {
