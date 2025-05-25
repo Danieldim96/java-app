@@ -28,6 +28,14 @@ public class Receipt implements Serializable {
         return receiptNumber;
     }
 
+    public Cashier getCashier() {
+        return cashier;
+    }
+
+    public double getTotalAmount() {
+        return totalAmount;
+    }
+
     public void addItem(Product product, int quantity, double price) {
         items.add(new ReceiptItem(product, quantity, price));
         totalAmount += price * quantity;

@@ -76,15 +76,21 @@ src/
 │   │       │   ├── ProductCategory.java - Product category enum (FOOD/NON_FOOD)
 │   │       │   └── Receipt.java - Receipt generation and serialization
 │   │       ├── service/
-│   │       │   └── Store.java - Main store management class
-│   │       └── util/
+│   │       │   ├── StoreService.java - Store service interface
+│   │       │   └── impl/
+│   │       │       └── StoreServiceImpl.java - Store service implementation
+│   │       └── exception/
 │   │           └── InsufficientQuantityException.java - Custom exception for stock management
 │   └── resources/ - Resource files
 └── test/
     └── java/
         └── org/
-            └── service/
-                └── StoreTest.java - Test cases for the store system
+            ├── service/
+            │   ├── StoreServiceTest.java - Interface contract tests
+            │   └── impl/
+            │       └── StoreServiceImplTest.java - Implementation-specific tests
+            └── integration/
+                └── StoreSystemIntegrationTest.java - End-to-end system tests
 
 build.gradle - Gradle build configuration
 gradle/ - Gradle wrapper files
@@ -128,6 +134,7 @@ README.md - This file
 - Prevents sales of expired products
 
 ### Exception Handling
+- Custom exceptions in dedicated `org.exception` package
 - InsufficientQuantityException for stock management
 - IllegalStateException for invalid operations
 - File handling exceptions for receipt operations
@@ -143,6 +150,28 @@ The `Main` class contains an example of how to use the system:
 5. View financial reports (expenses, income, profit)
 
 Receipts are automatically saved to files in the `output/receipts/` directory with names like `receipt_1.txt` and `receipt_1.ser`. The output directory is gitignored to keep generated files out of version control.
+
+## Testing Strategy
+
+The project follows enterprise-level testing practices with three types of tests:
+
+### Contract Tests (`StoreServiceTest`)
+- Test the service interface contract and business logic
+- Verify behavior regardless of implementation
+- Focus on business rules and expected outcomes
+- Use Given-When-Then format for clarity
+
+### Implementation Tests (`StoreServiceImplTest`)
+- Test implementation-specific features
+- File operations and directory creation
+- Error handling and edge cases
+- Multiple instance behavior
+
+### Integration Tests (`StoreSystemIntegrationTest`)
+- End-to-end testing of complete workflows
+- Realistic business scenarios
+- Multi-step operations verification
+- File generation and persistence testing
 
 ## Development
 
