@@ -1,10 +1,10 @@
 package org.service.impl;
 
 import org.data.Product;
+import org.service.ProductService;
+import org.service.PricingService;
 import org.exception.NegativePercentageException;
 import org.exception.ProductNotFoundException;
-import org.service.ProductService;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -12,23 +12,26 @@ import java.util.Map;
 
 public class ProductServiceImpl implements ProductService {
     private final Map<Integer, Product> products;
-    private final int expirationThreshold;
-    private final double expirationDiscount;
-    private double totalDeliveryExpenses = 0.0;
+    private final PricingService pricingService;
+
+    public ProductServiceImpl() {
+        this.products = new HashMap<>();
+        this.pricingService = new PricingServiceImpl(this, 7, 0.2); // Default values
+    }
 
     public ProductServiceImpl(int expirationThreshold, double expirationDiscount) {
-        if (expirationDiscount < 0) {
-            throw new NegativePercentageException(expirationDiscount);
-        }
         this.products = new HashMap<>();
-        this.expirationThreshold = expirationThreshold;
-        this.expirationDiscount = expirationDiscount;
+        this.pricingService = new PricingServiceImpl(this, expirationThreshold, expirationDiscount);
+    }
+
+    public ProductServiceImpl(PricingService pricingService) {
+        this.products = new HashMap<>();
+        this.pricingService = pricingService;
     }
 
     @Override
     public void addProduct(Product product) {
         products.put(product.getId(), product);
-        totalDeliveryExpenses += product.getDeliveryPrice() * product.getQuantity();
     }
 
     @Override
@@ -51,45 +54,21 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public boolean isProductExpired(int id) {
-        Product product = products.get(id);
-        if (product == null) {
-            return false;
-        }
-        return LocalDate.now().isAfter(product.getExpirationDate());
+        return pricingService.isProductExpired(id);
     }
 
     @Override
     public boolean isProductNearExpiration(int id) {
-        Product product = products.get(id);
-        if (product == null) {
-            return false;
-        }
-        return product.getExpirationDate().minusDays(expirationThreshold)
-                .isBefore(LocalDate.now());
+        return pricingService.isProductNearExpiration(id);
     }
 
     @Override
-    public double calculateSellingPrice(int id, double markup) {
-        if (markup < 0) {
-            throw new NegativePercentageException(markup);
-        }
-
-        Product product = products.get(id);
-        if (product == null) {
-            throw new ProductNotFoundException(id);
-        }
-
-        double basePrice = product.getDeliveryPrice();
-        double priceWithMarkup = basePrice * (1 + markup);
-
-        if (isProductNearExpiration(id)) {
-            priceWithMarkup *= (1.0 - expirationDiscount);
-        }
-
-        return Math.round(priceWithMarkup * 100.0) / 100.0;
+    public double calculateSellingPrice(int id, double markup) throws ProductNotFoundException, NegativePercentageException {
+        return pricingService.calculateSellingPrice(id, markup);
     }
 
+    @Override
     public double getTotalDeliveryExpenses() {
-        return totalDeliveryExpenses;
+        return pricingService.getTotalDeliveryExpenses();
     }
 }

@@ -37,7 +37,7 @@ public class Cashier implements Serializable {
         return name;
     }
 
-    public double getMonthlySalary() {
+    public double getSalary() {
         return monthlySalary;
     }
 

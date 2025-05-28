@@ -13,4 +13,6 @@ public interface CashierService {
     void assignCashierToRegister(int cashierId, int registerNumber);
 
     double getTotalSalaryExpenses();
+
+    Cashier getCashierAtRegister(int registerNumber);
 }

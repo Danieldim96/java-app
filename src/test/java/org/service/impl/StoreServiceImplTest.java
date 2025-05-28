@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import org.data.*;
 import org.service.StoreService;
 import org.exception.InsufficientQuantityException;
+import org.service.ReceiptPersistenceService;
 
 import java.io.File;
 import java.io.IOException;
@@ -21,11 +22,13 @@ import java.util.Map;
 public class StoreServiceImplTest {
     private StoreService store;
     private Cashier cashier;
+    private ReceiptPersistenceService persistenceService;
 
     @BeforeEach
     void setUp() {
         Receipt.resetReceiptCounter();
         store = new StoreServiceImpl(0.20, 0.30, 7, 0.15);
+        persistenceService = ((ReceiptServiceImpl) ((StoreServiceImpl) store).getReceiptService()).getPersistenceService();
 
         Product milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(5), 10); // 5 days triggers discount
@@ -57,8 +60,11 @@ public class StoreServiceImplTest {
                     });
         }
 
-        new StoreServiceImpl(0.20, 0.30, 7, 0.15);
-
+        StoreServiceImpl store = new StoreServiceImpl(0.20, 0.30, 7, 0.15);
+        Cashier cashier = new Cashier(1, "Test Cashier", 1000.0);
+        store.addCashier(cashier);
+        store.assignCashierToRegister(cashier, 1);
+        store.createSale(1, new HashMap<>());
         assertTrue(Files.exists(outputPath));
         assertTrue(Files.isDirectory(outputPath));
     }
@@ -69,8 +75,8 @@ public class StoreServiceImplTest {
         purchase.put(1, 1);
         Receipt receipt = store.createSale(1, purchase);
 
-        String txtFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".txt";
-        String serFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".ser";
+        String txtFile = persistenceService.getTextFilePath(receipt.getReceiptNumber());
+        String serFile = persistenceService.getSerializedFilePath(receipt.getReceiptNumber());
 
         assertTrue(new File(txtFile).exists(), "Text file should be created");
         assertTrue(new File(serFile).exists(), "Serialized file should be created");
@@ -82,14 +88,12 @@ public class StoreServiceImplTest {
 
     @Test
     void testReceiptSerializationAndDeserialization() throws Exception {
-
         Map<Integer, Integer> purchase = new HashMap<>();
         purchase.put(1, 1);
         Receipt receipt = store.createSale(1, purchase);
-        String serFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".ser";
+        String serFile = persistenceService.getSerializedFilePath(receipt.getReceiptNumber());
 
-
-        Receipt deserialized = Receipt.deserializeFromFile(serFile);
+        Receipt deserialized = persistenceService.deserializeReceiptFromFile(serFile);
         assertEquals(receipt.getReceiptNumber(), deserialized.getReceiptNumber());
         assertEquals(receipt.getTotalAmount(), deserialized.getTotalAmount(), 0.01);
         assertEquals(receipt.toString(), deserialized.toString());
@@ -102,10 +106,9 @@ public class StoreServiceImplTest {
         Map<Integer, Integer> purchase = new HashMap<>();
         purchase.put(1, 1);
         Receipt receipt = store.createSale(1, purchase);
-        String txtFile = "output/receipts/receipt_" + receipt.getReceiptNumber() + ".txt";
+        String txtFile = persistenceService.getTextFilePath(receipt.getReceiptNumber());
 
-
-        String fileText = Receipt.readReceiptTextFromFile(txtFile);
+        String fileText = persistenceService.readReceiptTextFromFile(txtFile);
 
         assertTrue(fileText.contains("Receipt #" + receipt.getReceiptNumber()));
         assertTrue(fileText.contains(cashier.getName()));
@@ -115,7 +118,6 @@ public class StoreServiceImplTest {
 
     @Test
     void testFileOperationErrorHandling() throws InsufficientQuantityException {
-
         Map<Integer, Integer> purchase = new HashMap<>();
         purchase.put(1, 1);
 

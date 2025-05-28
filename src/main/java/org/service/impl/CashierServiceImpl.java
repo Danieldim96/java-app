@@ -5,17 +5,17 @@ import org.exception.CashierNotFoundException;
 import org.exception.RegisterAlreadyAssignedException;
 import org.service.CashierService;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class CashierServiceImpl implements CashierService {
     private final Map<Integer, Cashier> cashiers;
-    private final Map<Integer, Integer> registerAssignments;
+    private final Map<Integer, Cashier> registerAssignments;
 
     public CashierServiceImpl() {
-        this.cashiers = new HashMap<>();
-        this.registerAssignments = new HashMap<>();
+        this.cashiers = new ConcurrentHashMap<>();
+        this.registerAssignments = new ConcurrentHashMap<>();
     }
 
     @Override
@@ -25,7 +25,11 @@ public class CashierServiceImpl implements CashierService {
 
     @Override
     public Cashier getCashier(int id) {
-        return cashiers.get(id);
+        Cashier cashier = cashiers.get(id);
+        if (cashier == null) {
+            throw new CashierNotFoundException(id);
+        }
+        return cashier;
     }
 
     @Override
@@ -35,21 +39,25 @@ public class CashierServiceImpl implements CashierService {
 
     @Override
     public void assignCashierToRegister(int cashierId, int registerNumber) {
-        Cashier cashier = cashiers.get(cashierId);
-        if (cashier == null) {
-            throw new CashierNotFoundException(cashierId);
-        }
-        if (registerAssignments.containsValue(registerNumber)) {
+        Cashier cashier = getCashier(cashierId);
+        
+        if (registerAssignments.containsKey(registerNumber)) {
             throw new RegisterAlreadyAssignedException(registerNumber);
         }
-        registerAssignments.put(cashierId, registerNumber);
+
         cashier.setRegisterNumber(registerNumber);
+        registerAssignments.put(registerNumber, cashier);
     }
 
     @Override
     public double getTotalSalaryExpenses() {
         return cashiers.values().stream()
-                .mapToDouble(Cashier::getMonthlySalary)
+                .mapToDouble(Cashier::getSalary)
                 .sum();
+    }
+
+    @Override
+    public Cashier getCashierAtRegister(int registerNumber) {
+        return registerAssignments.get(registerNumber);
     }
 }

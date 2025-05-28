@@ -10,11 +10,14 @@ import org.service.StoreService;
 import org.service.ProductService;
 import org.service.CashierService;
 import org.service.ReceiptService;
+import org.service.PricingService;
 import org.exception.ExpiredProductException;
 import org.exception.InsufficientQuantityException;
 import org.exception.NoAssignedCashierException;
 import org.exception.ProductNotFoundException;
 import org.exception.RegisterAlreadyAssignedException;
+import org.exception.NegativePercentageException;
+import org.exception.ReceiptPersistenceException;
 
 import java.io.IOException;
 import java.util.*;
@@ -23,36 +26,63 @@ public class StoreServiceImpl implements StoreService {
     private final ProductService productService;
     private final CashierService cashierService;
     private final ReceiptService receiptService;
+    private final PricingService pricingService;
     private final Store store;
     private final StoreConfig config;
 
+    public StoreServiceImpl(Store store, StoreConfig config, 
+            ProductService productService, CashierService cashierService, 
+            ReceiptService receiptService, PricingService pricingService) {
+        this.store = store;
+        this.config = config;
+        this.productService = productService;
+        this.cashierService = cashierService;
+        this.receiptService = receiptService;
+        this.pricingService = pricingService;
+    }
+
     public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
             int expirationThreshold, double expirationDiscount) {
-        this(new Store("Default Store", "Default Address", foodMarkup, nonFoodMarkup,
-                expirationThreshold, expirationDiscount), new StoreConfig());
+        StoreConfig config = new StoreConfig();
+        Store store = new Store("Default Store", "Default Address", foodMarkup, nonFoodMarkup,
+                expirationThreshold, expirationDiscount);
+        ProductService productService = new ProductServiceImpl(expirationThreshold, expirationDiscount);
+        CashierService cashierService = new CashierServiceImpl();
+        ReceiptService receiptService = new ReceiptServiceImpl(config);
+        PricingService pricingService = new PricingServiceImpl(productService, expirationThreshold, expirationDiscount);
+        
+        this.store = store;
+        this.config = config;
+        this.productService = productService;
+        this.cashierService = cashierService;
+        this.receiptService = receiptService;
+        this.pricingService = pricingService;
     }
 
     public StoreServiceImpl(Store store) {
         this(store, new StoreConfig());
     }
 
-    public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
-            int expirationThreshold, double expirationDiscount, StoreConfig config) {
-        this(new Store("Default Store", "Default Address", foodMarkup, nonFoodMarkup,
-                expirationThreshold, expirationDiscount), config);
-    }
-
     public StoreServiceImpl(Store store, StoreConfig config) {
+        ProductService productService = new ProductServiceImpl(store.getExpirationThreshold(), store.getExpirationDiscount());
+        CashierService cashierService = new CashierServiceImpl();
+        ReceiptService receiptService = new ReceiptServiceImpl(config);
+        PricingService pricingService = new PricingServiceImpl(productService, store.getExpirationThreshold(), store.getExpirationDiscount());
+        
         this.store = store;
         this.config = config;
-        this.productService = new ProductServiceImpl(store.getExpirationThreshold(), store.getExpirationDiscount());
-        this.cashierService = new CashierServiceImpl();
-        this.receiptService = new ReceiptServiceImpl(config);
+        this.productService = productService;
+        this.cashierService = cashierService;
+        this.receiptService = receiptService;
+        this.pricingService = pricingService;
     }
 
     @Override
     public void addProduct(Product product) {
         productService.addProduct(product);
+        if (pricingService instanceof PricingServiceImpl) {
+            ((PricingServiceImpl) pricingService).addProductDeliveryExpense(product);
+        }
     }
 
     @Override
@@ -76,17 +106,16 @@ public class StoreServiceImpl implements StoreService {
             throw new RegisterAlreadyAssignedException(registerNumber);
         }
         cashierService.assignCashierToRegister(cashier.getId(), registerNumber);
-        store.assignCashierToRegister(registerNumber, cashier);
     }
 
     @Override
     public Cashier getCashierAtRegister(int registerNumber) {
-        return store.getCashierAtRegister(registerNumber);
+        return cashierService.getCashierAtRegister(registerNumber);
     }
 
     @Override
     public boolean isRegisterAssigned(int registerNumber) {
-        return store.isRegisterAssigned(registerNumber);
+        return cashierService.getCashierAtRegister(registerNumber) != null;
     }
 
     @Override
@@ -102,7 +131,7 @@ public class StoreServiceImpl implements StoreService {
             if (product == null) {
                 throw new ProductNotFoundException(entry.getKey());
             }
-            if (productService.isProductExpired(product.getId())) {
+            if (pricingService.isProductExpired(product.getId())) {
                 throw new ExpiredProductException(product);
             }
             if (product.getQuantity() < entry.getValue()) {
@@ -118,7 +147,7 @@ public class StoreServiceImpl implements StoreService {
             int quantity = entry.getValue();
 
             double markup = product.getCategory() == ProductCategory.FOOD ? store.getFoodMarkup() : store.getNonFoodMarkup();
-            double price = productService.calculateSellingPrice(product.getId(), markup);
+            double price = pricingService.calculateSellingPrice(product.getId(), markup);
 
             totalAmount += price * quantity;
             soldItems.put(product, quantity);
@@ -143,15 +172,12 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     public double getDeliveryExpenses() {
-        if (productService instanceof ProductServiceImpl) {
-            return ((ProductServiceImpl) productService).getTotalDeliveryExpenses();
-        }
-        return 0.0;
+        return pricingService.getTotalDeliveryExpenses();
     }
 
     @Override
     public double getIncome() {
-        return getTotalRevenue();
+        return getTotalRevenue() - getDeliveryExpenses();
     }
 
     @Override
@@ -164,28 +190,21 @@ public class StoreServiceImpl implements StoreService {
         return receiptService.getTotalReceipts();
     }
 
-    public double calculateSellingPrice(int productId, double markup) {
-        Product product = productService.getProduct(productId);
-        if (product == null) {
-            throw new ProductNotFoundException(productId);
-        }
-
-        double basePrice = product.getDeliveryPrice();
-        double sellingPrice = basePrice * (1 + markup);
-
-        if (productService.isProductNearExpiration(product.getId())) {
-            sellingPrice *= (1 - store.getExpirationDiscount());
-        }
-
-        return sellingPrice;
-    }
-
-    public Receipt loadReceiptFromFile(int receiptNumber) throws IOException, ClassNotFoundException {
-        String filePath = config.getReceiptOutputDir() + "/receipt_" + receiptNumber + ".ser";
+    @Override
+    public Receipt loadReceiptFromFile(int receiptNumber) throws IOException, ClassNotFoundException, ReceiptPersistenceException {
+        String filePath = receiptService.getPersistenceService().getSerializedFilePath(receiptNumber);
         return receiptService.deserializeReceiptFromFile(filePath);
     }
 
     public Store getStore() {
         return store;
+    }
+
+    public ReceiptService getReceiptService() {
+        return receiptService;
+    }
+
+    public double calculateSellingPrice(int productId, double markup) throws ProductNotFoundException, NegativePercentageException {
+        return pricingService.calculateSellingPrice(productId, markup);
     }
 }

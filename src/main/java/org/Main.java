@@ -1,7 +1,15 @@
 package org;
 
 import org.data.*;
+import org.service.StoreService;
 import org.service.impl.StoreServiceImpl;
+import org.service.impl.ProductServiceImpl;
+import org.service.impl.CashierServiceImpl;
+import org.service.impl.ReceiptServiceImpl;
+import org.service.impl.PricingServiceImpl;
+import org.service.impl.ReceiptPersistenceServiceImpl;
+import org.service.ReceiptPersistenceService;
+import org.config.StoreConfig;
 import org.exception.*;
 import java.io.IOException;
 import java.time.LocalDate;
@@ -11,30 +19,17 @@ import java.util.Scanner;
 
 public class Main {
     private static Scanner scanner;
+    private static StoreService store;
 
     public static void main(String[] args) {
         try {
             scanner = new Scanner(System.in);
-            StoreServiceImpl store = setupStore();
+            store = setupStore();
             processCustomers(store);
-        } catch (InvalidInputException e) {
-            System.err.println("Input Error: " + e.getMessage());
-        } catch (InsufficientQuantityException e) {
-            System.err.println("Stock Error: " + e.getMessage());
-        } catch (ExpiredProductException e) {
-            System.err.println("Product Error: " + e.getMessage());
-        } catch (ProductNotFoundException e) {
-            System.err.println("Product Error: " + e.getMessage());
-        } catch (NoAssignedCashierException e) {
-            System.err.println("Register Error: " + e.getMessage());
-        } catch (RegisterAlreadyAssignedException e) {
-            System.err.println("Register Error: " + e.getMessage());
-        } catch (NegativeQuantityException e) {
-            System.err.println("Quantity Error: " + e.getMessage());
-        } catch (NegativePercentageException e) {
-            System.err.println("Percentage Error: " + e.getMessage());
-        } catch (ReceiptPersistenceException e) {
-            System.err.println("Receipt Error: " + e.getMessage());
+        } catch (InvalidInputException | InsufficientQuantityException | ExpiredProductException
+                | ProductNotFoundException | NoAssignedCashierException | RegisterAlreadyAssignedException
+                | NegativeQuantityException | NegativePercentageException | ReceiptPersistenceException e) {
+            System.err.println("Error: " + e.getMessage());
         } catch (Exception e) {
             System.err.println("Unexpected error: " + e.getMessage());
             e.printStackTrace();
@@ -45,7 +40,7 @@ public class Main {
         }
     }
 
-    private static StoreServiceImpl setupStore() {
+    private static StoreService setupStore() {
         System.out.println("=== STORE SETUP ===");
         
         String storeName = readString("Enter store name: ");
@@ -59,7 +54,15 @@ public class Main {
 
         Store storeData = new Store(storeName, storeAddress, foodMarkup, nonFoodMarkup, 
                 expirationThreshold, expirationDiscount);
-        StoreServiceImpl store = new StoreServiceImpl(storeData);
+        
+        StoreConfig config = new StoreConfig();
+        ProductServiceImpl productService = new ProductServiceImpl();
+        CashierServiceImpl cashierService = new CashierServiceImpl();
+        ReceiptPersistenceService receiptPersistenceService = new ReceiptPersistenceServiceImpl(config);
+        ReceiptServiceImpl receiptService = new ReceiptServiceImpl(receiptPersistenceService);
+        PricingServiceImpl pricingService = new PricingServiceImpl(productService, expirationThreshold, expirationDiscount);
+        
+        StoreService store = new StoreServiceImpl(storeData, config, productService, cashierService, receiptService, pricingService);
 
         setupProducts(store);
         setupCashiers(store);
@@ -67,7 +70,7 @@ public class Main {
         return store;
     }
 
-    private static void setupProducts(StoreServiceImpl store) {
+    private static void setupProducts(StoreService store) {
         System.out.println("\n=== PRODUCT SETUP ===");
         int numProducts = readPositiveInt("How many products do you want to add? ");
 
@@ -75,12 +78,12 @@ public class Main {
             System.out.println("\nProduct #" + (i + 1));
             String productName = readString("Enter product name: ");
             double deliveryPrice = readPositiveDouble("Enter delivery price: ");
-            
+
             System.out.print("Enter category (1 for FOOD, 2 for NON_FOOD): ");
             int categoryChoice = readInt();
             if (categoryChoice != 1 && categoryChoice != 2) {
-                throw new InvalidInputException("category", String.valueOf(categoryChoice), 
-                    "Must be 1 for FOOD or 2 for NON_FOOD");
+                throw new InvalidInputException("category", String.valueOf(categoryChoice),
+                        "Must be 1 for FOOD or 2 for NON_FOOD");
             }
             ProductCategory category = (categoryChoice == 1) ? ProductCategory.FOOD : ProductCategory.NON_FOOD;
 
@@ -93,7 +96,7 @@ public class Main {
         }
     }
 
-    private static void setupCashiers(StoreServiceImpl store) {
+    private static void setupCashiers(StoreService store) {
         System.out.println("\n=== CASHIER SETUP ===");
         String cashierName = readString("Enter cashier name: ");
         double cashierSalary = readPositiveDouble("Enter cashier monthly salary: ");
@@ -104,7 +107,7 @@ public class Main {
         store.assignCashierToRegister(cashier, registerNumber);
     }
 
-    private static void processCustomers(StoreServiceImpl store) {
+    private static void processCustomers(StoreService store) {
         System.out.println("=== STORE MANAGEMENT SYSTEM DEMO ===\n");
         displayInitialState(store);
 
@@ -118,7 +121,7 @@ public class Main {
         displayFinalState(store);
     }
 
-    private static void processCustomer(StoreServiceImpl store, int customerNumber) {
+    private static void processCustomer(StoreService store, int customerNumber) {
         System.out.println("\n=== CUSTOMER #" + customerNumber + " ===");
         int saleRegisterNumber = readPositiveInt("Enter register number for this sale: ");
 
@@ -136,22 +139,23 @@ public class Main {
                     .findFirst()
                     .orElseThrow(() -> new ProductNotFoundException(productId));
 
-            System.out.println("- " + quantity + "x " + product.getName() + 
-                    (product.isNearExpiration(store.getStore().getExpirationThreshold()) ? 
-                    " (near expiration - discount applied!)" : ""));
+            System.out.println("- " + quantity + "x " + product.getName() +
+                    (product.isNearExpiration(store.getStore().getExpirationThreshold())
+                            ? " (near expiration - discount applied!)"
+                            : ""));
         }
 
         try {
             Receipt receipt = store.createSale(saleRegisterNumber, purchase);
             displayReceipt(receipt, store);
             displayUpdatedInventory(store);
-        } catch (InsufficientQuantityException | ExpiredProductException | 
-                ProductNotFoundException | NoAssignedCashierException e) {
+        } catch (InsufficientQuantityException | ExpiredProductException | ProductNotFoundException
+                | NoAssignedCashierException e) {
             System.err.println("Sale failed: " + e.getMessage());
         }
     }
 
-    private static void displayInitialState(StoreServiceImpl store) {
+    private static void displayInitialState(StoreService store) {
         System.out.println("Initial Inventory:");
         for (Product product : store.getDeliveredProducts()) {
             System.out.printf("- %s: %d units @ %.2f BGN (expires: %s)\n",
@@ -162,11 +166,11 @@ public class Main {
         System.out.println("\nCashiers:");
         for (Cashier c : store.getCashiers()) {
             System.out.printf("- %s (Register %d, Salary: %.2f BGN)\n",
-                    c.getName(), c.getRegisterNumber(), c.getMonthlySalary());
+                    c.getName(), c.getRegisterNumber(), c.getSalary());
         }
     }
 
-    private static void displayReceipt(Receipt receipt, StoreServiceImpl store) {
+    private static void displayReceipt(Receipt receipt, StoreService store) {
         System.out.println("\n=== RECEIPT #" + receipt.getReceiptNumber() + " GENERATED ===");
         System.out.println("Receipt saved to: output/receipts/receipt_" + receipt.getReceiptNumber() + ".txt");
         System.out.println("Serialized to: output/receipts/receipt_" + receipt.getReceiptNumber() + ".ser");
@@ -185,7 +189,7 @@ public class Main {
         }
     }
 
-    private static void displayUpdatedInventory(StoreServiceImpl store) {
+    private static void displayUpdatedInventory(StoreService store) {
         System.out.println("\n=== UPDATED INVENTORY ===");
         for (Product product : store.getDeliveredProducts()) {
             System.out.printf("- %s: %d units remaining\n",
@@ -193,7 +197,7 @@ public class Main {
         }
     }
 
-    private static void displayFinalState(StoreServiceImpl store) {
+    private static void displayFinalState(StoreService store) {
         System.out.println("\n=== FINAL STORE STATUS ===");
         System.out.printf("Total Revenue: %.2f BGN\n", store.getTotalRevenue());
         System.out.printf("Salary Expenses: %.2f BGN\n", store.getSalaryExpenses());
@@ -258,18 +262,6 @@ public class Main {
                     return value;
                 }
                 System.out.println("Value must be greater than 0. Please try again.");
-            } catch (NumberFormatException e) {
-                System.out.println("Please enter a valid integer.");
-            }
-        }
-    }
-
-    private static int readInt(String prompt) {
-        while (true) {
-            try {
-                System.out.print(prompt);
-                System.out.flush();
-                return Integer.parseInt(scanner.nextLine().trim());
             } catch (NumberFormatException e) {
                 System.out.println("Please enter a valid integer.");
             }
