@@ -6,6 +6,7 @@ import org.data.Receipt;
 import org.data.ProductCategory;
 import org.service.impl.StoreServiceImpl;
 import org.exception.InsufficientQuantityException;
+import org.exception.RegisterAlreadyAssignedException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -73,18 +74,23 @@ public class StoreServiceTest {
         purchase.put(2, 1); // 1 bread
         store.createSale(1, purchase);
 
+        double revenue = store.getTotalRevenue();
+        double salaryExpenses = store.getSalaryExpenses();
+        double deliveryExpenses = store.getDeliveryExpenses();
+        double income = store.getIncome();
+        double profit = store.getProfit();
 
-        System.out.println("Total Revenue: " + store.getTotalRevenue());
-        System.out.println("Salary Expenses: " + store.getSalaryExpenses());
-        System.out.println("Delivery Expenses: " + store.getDeliveryExpenses());
-        System.out.println("Income: " + store.getIncome());
-        System.out.println("Profit: " + store.getProfit());
+        System.out.println("Total Revenue: " + revenue);
+        System.out.println("Salary Expenses: " + salaryExpenses);
+        System.out.println("Delivery Expenses: " + deliveryExpenses);
+        System.out.println("Income: " + income);
+        System.out.println("Profit: " + profit);
 
-        assertTrue(store.getTotalRevenue() > 0);
-        assertEquals(1500.0, store.getSalaryExpenses());
-        assertTrue(store.getDeliveryExpenses() > 0);
-        assertTrue(store.getIncome() > 0);
-        assertTrue(store.getProfit() < 0); // Negative profit due to high fixed costs
+        assertTrue(revenue > 0);
+        assertEquals(1500.0, salaryExpenses);
+        assertTrue(deliveryExpenses > 0);
+        assertEquals(revenue, income);
+        assertEquals(income - salaryExpenses, profit, 0.01);
     }
 
     @Test
@@ -121,7 +127,7 @@ public class StoreServiceTest {
         Cashier newCashier = new Cashier(2, "New Cashier", 1800.0);
         store.addCashier(newCashier);
 
-        assertThrows(IllegalStateException.class, () -> {
+        assertThrows(RegisterAlreadyAssignedException.class, () -> {
             store.assignCashierToRegister(newCashier, 1);
         });
     }

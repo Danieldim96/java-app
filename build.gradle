@@ -17,7 +17,7 @@ repositories {
 
 dependencies {
     testImplementation 'org.junit.jupiter:junit-jupiter:5.9.2'
-    testRuntimeOnly 'org.junit.jupiter:junit-jupiter-engine:5.9.2'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
 }
 
 application {
@@ -26,6 +26,13 @@ application {
 
 test {
     useJUnitPlatform()
+    testLogging {
+        events "passed", "skipped", "failed"
+    }
+}
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
 }
 
 jar {
@@ -34,4 +41,10 @@ jar {
             'Main-Class': 'org.Main'
         )
     }
+}
+
+tasks.named('run', JavaExec) {
+    standardInput = System.in
+    standardOutput = System.out
+    errorOutput = System.err
 } 

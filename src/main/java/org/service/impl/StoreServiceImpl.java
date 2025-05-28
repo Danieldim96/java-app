@@ -184,4 +184,8 @@ public class StoreServiceImpl implements StoreService {
         String filePath = config.getReceiptOutputDir() + "/receipt_" + receiptNumber + ".ser";
         return receiptService.deserializeReceiptFromFile(filePath);
     }
+
+    public Store getStore() {
+        return store;
+    }
 }
