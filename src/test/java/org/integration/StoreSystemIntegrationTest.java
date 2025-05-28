@@ -8,6 +8,8 @@ import org.data.*;
 import org.service.StoreService;
 import org.service.impl.StoreServiceImpl;
 import org.exception.InsufficientQuantityException;
+import org.exception.RegisterAlreadyAssignedException;
+import org.exception.NoAssignedCashierException;
 import org.data.Receipt;
 
 import java.io.File;
@@ -27,6 +29,8 @@ public class StoreSystemIntegrationTest {
     @BeforeEach
     void setUp() {
         Receipt.resetReceiptCounter();
+        Product.resetProductCounter();
+        Cashier.resetCashierCounter();
         store = new StoreServiceImpl(
                 0.25, // 25% markup for food
                 0.40, // 40% markup for non-food
@@ -37,13 +41,13 @@ public class StoreSystemIntegrationTest {
 
     @Test
     void testCompleteStoreOperationsWorkflow() throws InsufficientQuantityException {
-        Product milk = new Product(1, "Fresh Milk", 3.0, ProductCategory.FOOD,
+        Product milk = new Product("Fresh Milk", 3.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(7), 20);
-        Product bread = new Product(2, "Whole Bread", 2.5, ProductCategory.FOOD,
+        Product bread = new Product("Whole Bread", 2.5, ProductCategory.FOOD,
                 LocalDate.now().plusDays(3), 15); // Near expiration
-        Product soap = new Product(3, "Hand Soap", 4.0, ProductCategory.NON_FOOD,
+        Product soap = new Product("Hand Soap", 4.0, ProductCategory.NON_FOOD,
                 LocalDate.now().plusDays(365), 10);
-        Product cheese = new Product(4, "Cheddar Cheese", 5.0, ProductCategory.FOOD,
+        Product cheese = new Product("Cheddar Cheese", 5.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(14), 8);
 
         store.addProduct(milk);
@@ -51,8 +55,8 @@ public class StoreSystemIntegrationTest {
         store.addProduct(soap);
         store.addProduct(cheese);
 
-        Cashier alice = new Cashier(1, "Alice Johnson", 2200.0);
-        Cashier bob = new Cashier(2, "Bob Smith", 2000.0);
+        Cashier alice = new Cashier("Alice Johnson", 2200.0);
+        Cashier bob = new Cashier("Bob Smith", 2000.0);
 
         store.addCashier(alice);
         store.addCashier(bob);
@@ -60,9 +64,9 @@ public class StoreSystemIntegrationTest {
         store.assignCashierToRegister(bob, 2);
 
         Map<Integer, Integer> purchase1 = new HashMap<>();
-        purchase1.put(1, 3); // 3 milk
-        purchase1.put(3, 2); // 2 soap
-        purchase1.put(4, 1); // 1 cheese
+        purchase1.put(milk.getId(), 3); // 3 milk
+        purchase1.put(soap.getId(), 2); // 2 soap
+        purchase1.put(cheese.getId(), 1); // 1 cheese
 
         Receipt receipt1 = store.createSale(1, purchase1);
         assertNotNull(receipt1);
@@ -76,8 +80,8 @@ public class StoreSystemIntegrationTest {
         assertEquals(expectedTotal1, receipt1.getTotalAmount(), 0.01);
 
         Map<Integer, Integer> purchase2 = new HashMap<>();
-        purchase2.put(2, 5); // 5 bread (near expiration - should get discount)
-        purchase2.put(1, 2); // 2 milk
+        purchase2.put(bread.getId(), 5); // 5 bread (near expiration - should get discount)
+        purchase2.put(milk.getId(), 2); // 2 milk
 
         Receipt receipt2 = store.createSale(2, purchase2);
         assertNotNull(receipt2);
@@ -120,20 +124,20 @@ public class StoreSystemIntegrationTest {
 
     @Test
     void testBusinessRulesEnforcement() {
-        Product expiredProduct = new Product(10, "Expired Yogurt", 2.0, ProductCategory.FOOD,
+        Product expiredProduct = new Product("Expired Yogurt", 2.0, ProductCategory.FOOD,
                 LocalDate.now().minusDays(1), 5);
-        Product lowStockProduct = new Product(11, "Limited Chips", 3.0, ProductCategory.NON_FOOD,
+        Product lowStockProduct = new Product("Limited Chips", 3.0, ProductCategory.NON_FOOD,
                 LocalDate.now().plusDays(30), 2);
 
         store.addProduct(expiredProduct);
         store.addProduct(lowStockProduct);
 
-        Cashier cashier = new Cashier(1, "Test Cashier", 2000.0);
+        Cashier cashier = new Cashier("Test Cashier", 2000.0);
         store.addCashier(cashier);
         store.assignCashierToRegister(cashier, 1);
 
         Map<Integer, Integer> oversizedPurchase = new HashMap<>();
-        oversizedPurchase.put(11, 5); // Try to buy 5, only 2 available
+        oversizedPurchase.put(lowStockProduct.getId(), 5); // Try to buy 5, only 2 available
 
         InsufficientQuantityException exception = assertThrows(InsufficientQuantityException.class, () -> {
             store.createSale(1, oversizedPurchase);
@@ -145,11 +149,11 @@ public class StoreSystemIntegrationTest {
         Cashier anotherCashier = new Cashier(2, "Another Cashier", 1800.0);
         store.addCashier(anotherCashier);
 
-        assertThrows(IllegalStateException.class, () -> {
+        assertThrows(RegisterAlreadyAssignedException.class, () -> {
             store.assignCashierToRegister(anotherCashier, 1); // Register 1 already taken
         });
 
-        assertThrows(IllegalStateException.class, () -> {
+        assertThrows(NoAssignedCashierException.class, () -> {
             Map<Integer, Integer> purchase = new HashMap<>();
             purchase.put(11, 1);
             store.createSale(3, purchase); // Register 3 not assigned
@@ -158,13 +162,13 @@ public class StoreSystemIntegrationTest {
 
     @Test
     void testConcurrentOperationsSimulation() throws InsufficientQuantityException {
-        Product popularItem = new Product(20, "Popular Snack", 1.0, ProductCategory.NON_FOOD,
+        Product popularItem = new Product("Popular Snack", 1.0, ProductCategory.NON_FOOD,
                 LocalDate.now().plusDays(60), 100);
         store.addProduct(popularItem);
 
-        Cashier cashier1 = new Cashier(1, "Fast Cashier", 2100.0);
-        Cashier cashier2 = new Cashier(2, "Careful Cashier", 2300.0);
-        Cashier cashier3 = new Cashier(3, "New Cashier", 1900.0);
+        Cashier cashier1 = new Cashier("Fast Cashier", 2100.0);
+        Cashier cashier2 = new Cashier("Careful Cashier", 2300.0);
+        Cashier cashier3 = new Cashier("New Cashier", 1900.0);
 
         store.addCashier(cashier1);
         store.addCashier(cashier2);
@@ -175,13 +179,13 @@ public class StoreSystemIntegrationTest {
         store.assignCashierToRegister(cashier3, 3);
 
         Map<Integer, Integer> sale1 = new HashMap<>();
-        sale1.put(20, 15);
+        sale1.put(popularItem.getId(), 15);
 
         Map<Integer, Integer> sale2 = new HashMap<>();
-        sale2.put(20, 20);
+        sale2.put(popularItem.getId(), 20);
 
         Map<Integer, Integer> sale3 = new HashMap<>();
-        sale3.put(20, 10);
+        sale3.put(popularItem.getId(), 10);
 
         Receipt receipt1 = store.createSale(1, sale1);
         Receipt receipt2 = store.createSale(2, sale2);
@@ -203,20 +207,20 @@ public class StoreSystemIntegrationTest {
     @Test
     void testReceiptSerializationAndDeserialization() throws Exception {
         // Given a complete sale with multiple items
-        Product milk = new Product(1, "Fresh Milk", 3.0, ProductCategory.FOOD,
+        Product milk = new Product("Fresh Milk", 3.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(7), 20);
-        Product bread = new Product(2, "Whole Bread", 2.5, ProductCategory.FOOD,
+        Product bread = new Product("Whole Bread", 2.5, ProductCategory.FOOD,
                 LocalDate.now().plusDays(3), 15);
         store.addProduct(milk);
         store.addProduct(bread);
 
-        Cashier cashier = new Cashier(1, "Test Cashier", 2000.0);
+        Cashier cashier = new Cashier("Test Cashier", 2000.0);
         store.addCashier(cashier);
         store.assignCashierToRegister(cashier, 1);
 
         Map<Integer, Integer> purchase = new HashMap<>();
-        purchase.put(1, 2); // 2 milk
-        purchase.put(2, 3); // 3 bread (near expiration)
+        purchase.put(milk.getId(), 2); // 2 milk
+        purchase.put(bread.getId(), 3); // 3 bread (near expiration)
 
         // When creating a sale and deserializing the receipt
         Receipt originalReceipt = store.createSale(1, purchase);
@@ -253,21 +257,21 @@ public class StoreSystemIntegrationTest {
     @Test
     void testMultipleReceiptsSerialization() throws Exception {
         // Given multiple sales
-        Product product = new Product(1, "Test Product", 10.0, ProductCategory.FOOD,
+        Product product = new Product("Test Product", 10.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(10), 10);
         store.addProduct(product);
 
-        Cashier cashier = new Cashier(1, "Test Cashier", 2000.0);
+        Cashier cashier = new Cashier("Test Cashier", 2000.0);
         store.addCashier(cashier);
         store.assignCashierToRegister(cashier, 1);
 
         // When creating multiple sales
         Map<Integer, Integer> purchase1 = new HashMap<>();
-        purchase1.put(1, 2);
+        purchase1.put(product.getId(), 2);
         Receipt receipt1 = store.createSale(1, purchase1);
 
         Map<Integer, Integer> purchase2 = new HashMap<>();
-        purchase2.put(1, 3);
+        purchase2.put(product.getId(), 3);
         Receipt receipt2 = store.createSale(1, purchase2);
 
         // Then both receipts should be properly serialized and deserialized
@@ -298,16 +302,16 @@ public class StoreSystemIntegrationTest {
     @Test
     void testProfitCalculation() {
 
-        Product product = new Product(30, "Test Product", 10.0, ProductCategory.FOOD,
+        Product product = new Product("Test Product", 10.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(10), 5);
         store.addProduct(product);
 
-        Cashier cashier = new Cashier(4, "Test Cashier", 2000.0);
+        Cashier cashier = new Cashier("Test Cashier", 2000.0);
         store.addCashier(cashier);
         store.assignCashierToRegister(cashier, 4);
 
         Map<Integer, Integer> purchase = new HashMap<>();
-        purchase.put(30, 2);
+        purchase.put(product.getId(), 2);
         store.createSale(4, purchase);
 
         double income = store.getIncome();

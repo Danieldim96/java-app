@@ -14,5 +14,7 @@ public interface ProductService {
 
     boolean isProductNearExpiration(int productId);
 
+    boolean isProductExpired(int productId);
+
     double calculateSellingPrice(int productId, double markup);
 }

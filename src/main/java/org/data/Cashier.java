@@ -1,9 +1,12 @@
 package org.data;
 
 import java.io.Serializable;
+import org.exception.NegativeRegisterNumberException;
 
 public class Cashier implements Serializable {
     private static final long serialVersionUID = 1L;
+    private static volatile int nextCashierId = 1;
+    private static final Object cashierIdLock = new Object();
 
     private final int id;
     private final String name;
@@ -14,7 +17,16 @@ public class Cashier implements Serializable {
         this.id = id;
         this.name = name;
         this.monthlySalary = monthlySalary;
-        this.registerNumber = -1; // -1 indicates no register assigned
+        this.registerNumber = -1;
+    }
+
+    public Cashier(String name, double monthlySalary) {
+        synchronized (cashierIdLock) {
+            this.id = nextCashierId++;
+        }
+        this.name = name;
+        this.monthlySalary = monthlySalary;
+        this.registerNumber = -1;
     }
 
     public int getId() {
@@ -35,7 +47,7 @@ public class Cashier implements Serializable {
 
     public void setRegisterNumber(int registerNumber) {
         if (registerNumber < 0) {
-            throw new IllegalArgumentException("Register number cannot be negative");
+            throw new NegativeRegisterNumberException(registerNumber);
         }
         this.registerNumber = registerNumber;
     }
@@ -59,5 +71,11 @@ public class Cashier implements Serializable {
     public String toString() {
         return String.format("%s (ID: %d, Salary: %.2f, Register: %d)",
                 name, id, monthlySalary, registerNumber);
+    }
+
+    public static void resetCashierCounter() {
+        synchronized (cashierIdLock) {
+            nextCashierId = 1;
+        }
     }
 }

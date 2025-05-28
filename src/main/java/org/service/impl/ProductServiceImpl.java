@@ -1,6 +1,8 @@
 package org.service.impl;
 
 import org.data.Product;
+import org.exception.NegativePercentageException;
+import org.exception.ProductNotFoundException;
 import org.service.ProductService;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -15,6 +17,9 @@ public class ProductServiceImpl implements ProductService {
     private double totalDeliveryExpenses = 0.0;
 
     public ProductServiceImpl(int expirationThreshold, double expirationDiscount) {
+        if (expirationDiscount < 0) {
+            throw new NegativePercentageException(expirationDiscount);
+        }
         this.products = new HashMap<>();
         this.expirationThreshold = expirationThreshold;
         this.expirationDiscount = expirationDiscount;
@@ -45,6 +50,15 @@ public class ProductServiceImpl implements ProductService {
     }
 
     @Override
+    public boolean isProductExpired(int id) {
+        Product product = products.get(id);
+        if (product == null) {
+            return false;
+        }
+        return LocalDate.now().isAfter(product.getExpirationDate());
+    }
+
+    @Override
     public boolean isProductNearExpiration(int id) {
         Product product = products.get(id);
         if (product == null) {
@@ -56,9 +70,13 @@ public class ProductServiceImpl implements ProductService {
 
     @Override
     public double calculateSellingPrice(int id, double markup) {
+        if (markup < 0) {
+            throw new NegativePercentageException(markup);
+        }
+
         Product product = products.get(id);
         if (product == null) {
-            throw new IllegalArgumentException("Product not found: " + id);
+            throw new ProductNotFoundException(id);
         }
 
         double basePrice = product.getDeliveryPrice();

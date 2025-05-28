@@ -13,8 +13,10 @@ class CashierServiceTest {
     void setUp() {
         cashierService = new CashierServiceImpl();
 
-        Cashier john = new Cashier(1, "John Doe", 1500.0);
-        Cashier jane = new Cashier(2, "Jane Smith", 1600.0);
+        Cashier.resetCashierCounter();
+
+        Cashier john = new Cashier("John Doe", 1500.0);
+        Cashier jane = new Cashier("Jane Smith", 1600.0);
 
         cashierService.addCashier(john);
         cashierService.addCashier(jane);
@@ -22,6 +24,7 @@ class CashierServiceTest {
 
     @Test
     void testAddAndGetCashier() {
+        // Since we reset the counter, john should have ID 1
         Cashier retrievedJohn = cashierService.getCashier(1);
         assertNotNull(retrievedJohn);
         assertEquals("John Doe", retrievedJohn.getName());
@@ -30,6 +33,7 @@ class CashierServiceTest {
 
     @Test
     void testAssignCashierToRegister() {
+        // Since we reset the counter, john should have ID 1
         cashierService.assignCashierToRegister(1, 1);
         Cashier john = cashierService.getCashier(1);
         assertEquals(1, john.getRegisterNumber());

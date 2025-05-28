@@ -2,6 +2,7 @@ package org.service;
 
 import org.data.Product;
 import org.data.ProductCategory;
+import org.exception.NegativePercentageException;
 import org.service.impl.ProductServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -15,9 +16,11 @@ class ProductServiceTest {
     void setUp() {
         productService = new ProductServiceImpl(7, 0.15);
 
-        Product milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
+        Product.resetProductCounter();
+
+        Product milk = new Product("Milk", 2.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(10), 10);
-        Product bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
+        Product bread = new Product("Bread", 1.5, ProductCategory.FOOD,
                 LocalDate.now().plusDays(3), 15);
 
         productService.addProduct(milk);
@@ -26,6 +29,7 @@ class ProductServiceTest {
 
     @Test
     void testAddAndGetProduct() {
+        // Since we reset the counter, milk should have ID 1
         Product retrievedMilk = productService.getProduct(1);
         assertNotNull(retrievedMilk);
         assertEquals("Milk", retrievedMilk.getName());
@@ -34,6 +38,7 @@ class ProductServiceTest {
 
     @Test
     void testUpdateProductQuantity() {
+        // Since we reset the counter, milk should have ID 1
         productService.updateProductQuantity(1, 5);
         Product updatedMilk = productService.getProduct(1);
         assertEquals(5, updatedMilk.getQuantity());
@@ -52,5 +57,23 @@ class ProductServiceTest {
 
         double breadPrice = productService.calculateSellingPrice(2, 0.20);
         assertEquals(1.53, breadPrice, 0.001);
+    }
+
+    @Test
+    void testNegativeExpirationDiscount() {
+        Exception exception = assertThrows(NegativePercentageException.class, () -> {
+            new ProductServiceImpl(7, -0.15);
+        });
+
+        assertTrue(exception.getMessage().contains("Negative percentage value is not allowed"));
+    }
+
+    @Test
+    void testNegativeMarkup() {
+        Exception exception = assertThrows(NegativePercentageException.class, () -> {
+            productService.calculateSellingPrice(1, -0.20);
+        });
+
+        assertTrue(exception.getMessage().contains("Negative percentage value is not allowed"));
     }
 }

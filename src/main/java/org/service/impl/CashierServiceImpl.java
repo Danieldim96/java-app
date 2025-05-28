@@ -1,6 +1,8 @@
 package org.service.impl;
 
 import org.data.Cashier;
+import org.exception.CashierNotFoundException;
+import org.exception.RegisterAlreadyAssignedException;
 import org.service.CashierService;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,10 +37,10 @@ public class CashierServiceImpl implements CashierService {
     public void assignCashierToRegister(int cashierId, int registerNumber) {
         Cashier cashier = cashiers.get(cashierId);
         if (cashier == null) {
-            throw new IllegalArgumentException("Cashier not found: " + cashierId);
+            throw new CashierNotFoundException(cashierId);
         }
         if (registerAssignments.containsValue(registerNumber)) {
-            throw new IllegalStateException("Register " + registerNumber + " is already assigned to another cashier.");
+            throw new RegisterAlreadyAssignedException(registerNumber);
         }
         registerAssignments.put(cashierId, registerNumber);
         cashier.setRegisterNumber(registerNumber);

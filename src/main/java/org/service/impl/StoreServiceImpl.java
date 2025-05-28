@@ -1,37 +1,53 @@
 package org.service.impl;
 
+import org.config.StoreConfig;
 import org.data.Product;
 import org.data.Cashier;
 import org.data.Receipt;
 import org.data.ProductCategory;
+import org.data.Store;
 import org.service.StoreService;
 import org.service.ProductService;
 import org.service.CashierService;
 import org.service.ReceiptService;
+import org.exception.ExpiredProductException;
 import org.exception.InsufficientQuantityException;
+import org.exception.NoAssignedCashierException;
+import org.exception.ProductNotFoundException;
+import org.exception.RegisterAlreadyAssignedException;
 
+import java.io.IOException;
 import java.util.*;
 
 public class StoreServiceImpl implements StoreService {
     private final ProductService productService;
     private final CashierService cashierService;
     private final ReceiptService receiptService;
-    private final double foodMarkup;
-    private final double nonFoodMarkup;
-    private final int expirationThreshold;
-    private final double expirationDiscount;
-    private final Map<Integer, Cashier> registerAssignments;
+    private final Store store;
+    private final StoreConfig config;
 
     public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
             int expirationThreshold, double expirationDiscount) {
-        this.productService = new ProductServiceImpl(expirationThreshold, expirationDiscount);
+        this(new Store("Default Store", "Default Address", foodMarkup, nonFoodMarkup,
+                expirationThreshold, expirationDiscount), new StoreConfig());
+    }
+
+    public StoreServiceImpl(Store store) {
+        this(store, new StoreConfig());
+    }
+
+    public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
+            int expirationThreshold, double expirationDiscount, StoreConfig config) {
+        this(new Store("Default Store", "Default Address", foodMarkup, nonFoodMarkup,
+                expirationThreshold, expirationDiscount), config);
+    }
+
+    public StoreServiceImpl(Store store, StoreConfig config) {
+        this.store = store;
+        this.config = config;
+        this.productService = new ProductServiceImpl(store.getExpirationThreshold(), store.getExpirationDiscount());
         this.cashierService = new CashierServiceImpl();
-        this.receiptService = new ReceiptServiceImpl();
-        this.foodMarkup = foodMarkup;
-        this.nonFoodMarkup = nonFoodMarkup;
-        this.expirationThreshold = expirationThreshold;
-        this.expirationDiscount = expirationDiscount;
-        this.registerAssignments = new HashMap<>();
+        this.receiptService = new ReceiptServiceImpl(config);
     }
 
     @Override
@@ -56,37 +72,44 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     public void assignCashierToRegister(Cashier cashier, int registerNumber) {
-        if (registerAssignments.containsKey(registerNumber)) {
-            throw new IllegalStateException("Register " + registerNumber + " is already assigned to a cashier");
+        if (isRegisterAssigned(registerNumber)) {
+            throw new RegisterAlreadyAssignedException(registerNumber);
         }
         cashierService.assignCashierToRegister(cashier.getId(), registerNumber);
-        registerAssignments.put(registerNumber, cashier);
+        store.assignCashierToRegister(registerNumber, cashier);
+    }
+
+    @Override
+    public Cashier getCashierAtRegister(int registerNumber) {
+        return store.getCashierAtRegister(registerNumber);
+    }
+
+    @Override
+    public boolean isRegisterAssigned(int registerNumber) {
+        return store.isRegisterAssigned(registerNumber);
     }
 
     @Override
     public Receipt createSale(int registerNumber, Map<Integer, Integer> purchase)
             throws InsufficientQuantityException {
-        // Validate register assignment
-        Cashier cashier = registerAssignments.get(registerNumber);
+        Cashier cashier = getCashierAtRegister(registerNumber);
         if (cashier == null) {
-            throw new IllegalStateException("No cashier assigned to register " + registerNumber);
+            throw new NoAssignedCashierException(registerNumber);
         }
 
-        // Validate quantities
         for (Map.Entry<Integer, Integer> entry : purchase.entrySet()) {
             Product product = productService.getProduct(entry.getKey());
             if (product == null) {
-                throw new IllegalArgumentException("Product not found: " + entry.getKey());
+                throw new ProductNotFoundException(entry.getKey());
             }
-            if (product.isExpired()) {
-                throw new IllegalStateException("Cannot sell expired product: " + product.getName());
+            if (productService.isProductExpired(product.getId())) {
+                throw new ExpiredProductException(product);
             }
             if (product.getQuantity() < entry.getValue()) {
                 throw new InsufficientQuantityException(product, entry.getValue());
             }
         }
 
-        // Calculate total and update inventory
         double totalAmount = 0;
         Map<Product, Integer> soldItems = new HashMap<>();
 
@@ -94,20 +117,17 @@ public class StoreServiceImpl implements StoreService {
             Product product = productService.getProduct(entry.getKey());
             int quantity = entry.getValue();
 
-            // Calculate price with appropriate markup
-            double markup = product.getCategory() == ProductCategory.FOOD ? foodMarkup : nonFoodMarkup;
+            double markup = product.getCategory() == ProductCategory.FOOD ? store.getFoodMarkup() : store.getNonFoodMarkup();
             double price = productService.calculateSellingPrice(product.getId(), markup);
 
             totalAmount += price * quantity;
             soldItems.put(product, quantity);
 
-            // Update inventory
             productService.updateProductQuantity(
                     product.getId(),
                     product.getQuantity() - quantity);
         }
 
-        // Create and save receipt
         return receiptService.createReceipt(cashier, registerNumber, soldItems, totalAmount);
     }
 
@@ -147,23 +167,21 @@ public class StoreServiceImpl implements StoreService {
     public double calculateSellingPrice(int productId, double markup) {
         Product product = productService.getProduct(productId);
         if (product == null) {
-            throw new IllegalArgumentException("Product not found: " + productId);
+            throw new ProductNotFoundException(productId);
         }
 
         double basePrice = product.getDeliveryPrice();
         double sellingPrice = basePrice * (1 + markup);
 
-        // Apply expiration discount if needed
-        if (product.isNearExpiration(expirationThreshold)) {
-            sellingPrice *= (1 - expirationDiscount);
+        if (productService.isProductNearExpiration(product.getId())) {
+            sellingPrice *= (1 - store.getExpirationDiscount());
         }
 
         return sellingPrice;
     }
 
-    // Load a receipt from file by its number
-    public Receipt loadReceiptFromFile(int receiptNumber) throws Exception {
-        String filePath = "output/receipts/receipt_" + receiptNumber + ".ser";
-        return Receipt.deserializeFromFile(filePath);
+    public Receipt loadReceiptFromFile(int receiptNumber) throws IOException, ClassNotFoundException {
+        String filePath = config.getReceiptOutputDir() + "/receipt_" + receiptNumber + ".ser";
+        return receiptService.deserializeReceiptFromFile(filePath);
     }
 }
