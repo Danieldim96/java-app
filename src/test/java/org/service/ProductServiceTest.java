@@ -10,16 +10,14 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class ProductServiceTest {
     private ProductService productService;
-    private Product milk;
-    private Product bread;
 
     @BeforeEach
     void setUp() {
         productService = new ProductServiceImpl(7, 0.15);
 
-        milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
+        Product milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(10), 10);
-        bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
+        Product bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
                 LocalDate.now().plusDays(3), 15);
 
         productService.addProduct(milk);

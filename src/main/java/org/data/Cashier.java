@@ -5,9 +5,9 @@ import java.io.Serializable;
 public class Cashier implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private int id;
-    private String name;
-    private double monthlySalary;
+    private final int id;
+    private final String name;
+    private final double monthlySalary;
     private int registerNumber;
 
     public Cashier(int id, String name, double monthlySalary) {

@@ -6,11 +6,11 @@ import java.time.LocalDate;
 public class Product implements Serializable {
     private static final long serialVersionUID = 1L;
 
-    private int id;
-    private String name;
-    private double deliveryPrice;
-    private ProductCategory category;
-    private LocalDate expirationDate;
+    private final int id;
+    private final String name;
+    private final double deliveryPrice;
+    private final ProductCategory category;
+    private final LocalDate expirationDate;
     private int quantity;
 
     public Product(int id, String name, double deliveryPrice, ProductCategory category,

@@ -7,7 +7,8 @@ import java.util.Map;
 
 public class Receipt implements Serializable {
     private static final long serialVersionUID = 1L;
-    private static int nextReceiptNumber = 1;
+    private static volatile int nextReceiptNumber = 1;
+    private static final Object receiptNumberLock = new Object();
 
     private final int receiptNumber;
     private final LocalDateTime date;
@@ -16,7 +17,9 @@ public class Receipt implements Serializable {
     private final double totalAmount;
 
     public Receipt(Cashier cashier, Map<Product, Integer> items, double totalAmount) {
-        this.receiptNumber = nextReceiptNumber++;
+        synchronized (receiptNumberLock) {
+            this.receiptNumber = nextReceiptNumber++;
+        }
         this.date = LocalDateTime.now();
         this.cashier = cashier;
         this.items = new HashMap<>(items);
@@ -41,12 +44,6 @@ public class Receipt implements Serializable {
 
     public double getTotalAmount() {
         return totalAmount;
-    }
-
-    public void serializeToFile(String filePath) throws IOException {
-        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(filePath))) {
-            oos.writeObject(this);
-        }
     }
 
     public static Receipt deserializeFromFile(String filePath) throws IOException, ClassNotFoundException {
@@ -97,6 +94,8 @@ public class Receipt implements Serializable {
     }
 
     public static void resetReceiptCounter() {
-        nextReceiptNumber = 1;
+        synchronized (receiptNumberLock) {
+            nextReceiptNumber = 1;
+        }
     }
 }

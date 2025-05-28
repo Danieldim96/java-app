@@ -18,6 +18,8 @@ public class StoreServiceImpl implements StoreService {
     private final ReceiptService receiptService;
     private final double foodMarkup;
     private final double nonFoodMarkup;
+    private final int expirationThreshold;
+    private final double expirationDiscount;
     private final Map<Integer, Cashier> registerAssignments;
 
     public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
@@ -27,6 +29,8 @@ public class StoreServiceImpl implements StoreService {
         this.receiptService = new ReceiptServiceImpl();
         this.foodMarkup = foodMarkup;
         this.nonFoodMarkup = nonFoodMarkup;
+        this.expirationThreshold = expirationThreshold;
+        this.expirationDiscount = expirationDiscount;
         this.registerAssignments = new HashMap<>();
     }
 
@@ -74,7 +78,7 @@ public class StoreServiceImpl implements StoreService {
             if (product == null) {
                 throw new IllegalArgumentException("Product not found: " + entry.getKey());
             }
-            if (product.getExpirationDate().isBefore(java.time.LocalDate.now())) {
+            if (product.isExpired()) {
                 throw new IllegalStateException("Cannot sell expired product: " + product.getName());
             }
             if (product.getQuantity() < entry.getValue()) {
@@ -150,8 +154,8 @@ public class StoreServiceImpl implements StoreService {
         double sellingPrice = basePrice * (1 + markup);
 
         // Apply expiration discount if needed
-        if (product.isNearExpiration(7)) { // Using 7 days as threshold
-            sellingPrice *= (1 - 0.15); // 15% discount
+        if (product.isNearExpiration(expirationThreshold)) {
+            sellingPrice *= (1 - expirationDiscount);
         }
 
         return sellingPrice;

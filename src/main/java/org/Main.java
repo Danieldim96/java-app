@@ -1,7 +1,6 @@
 package org;
 
 import org.data.*;
-import org.service.StoreService;
 import org.service.impl.StoreServiceImpl;
 import org.exception.InsufficientQuantityException;
 
@@ -11,10 +10,10 @@ import java.util.Map;
 
 public class Main {
     public static void main(String[] args) {
-        StoreService store = new StoreServiceImpl(
+        StoreServiceImpl store = new StoreServiceImpl(
                 0.20, // 20% markup for food
                 0.30, // 30% markup for non-food
-                7, // 7 days threshold for expiration discount
+                7, // 7-day threshold for expiration discount
                 0.15 // 15% discount for near-expiration items
         );
 
@@ -74,14 +73,12 @@ public class Main {
             System.out.printf("Total Amount: %.2f BGN\n", receipt.getTotalAmount());
 
             // === DEMO: Load and print the receipt from file ===
-            if (store instanceof org.service.impl.StoreServiceImpl) {
-                try {
-                    Receipt loaded = ((org.service.impl.StoreServiceImpl) store).loadReceiptFromFile(receipt.getReceiptNumber());
-                    System.out.println("\n=== LOADED RECEIPT FROM FILE ===");
-                    System.out.println(loaded);
-                } catch (Exception e) {
-                    System.out.println("Failed to load receipt from file: " + e.getMessage());
-                }
+            try {
+                Receipt loaded = store.loadReceiptFromFile(receipt.getReceiptNumber());
+                System.out.println("\n=== LOADED RECEIPT FROM FILE ===");
+                System.out.println(loaded);
+            } catch (Exception e) {
+                System.out.println("Failed to load receipt from file: " + e.getMessage());
             }
 
             System.out.println("\n=== UPDATED INVENTORY ===");
@@ -178,9 +175,7 @@ public class Main {
             System.out.printf("Profit: %.2f BGN\n", profit);
             System.out.printf("Expected Profit: %.2f BGN\n", income - salaryExpenses);
 
-        } catch (InsufficientQuantityException e) {
-            System.err.println("Error: " + e.getMessage());
-        } catch (IllegalStateException e) {
+        } catch (InsufficientQuantityException | IllegalStateException e) {
             System.err.println("Error: " + e.getMessage());
         }
     }

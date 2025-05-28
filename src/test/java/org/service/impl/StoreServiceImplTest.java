@@ -24,9 +24,6 @@ import java.util.Map;
  */
 public class StoreServiceImplTest {
     private StoreService store;
-    private Product milk;
-    private Product bread;
-    private Product soap;
     private Cashier cashier;
 
     @BeforeEach
@@ -34,11 +31,11 @@ public class StoreServiceImplTest {
         Receipt.resetReceiptCounter();
         store = new StoreServiceImpl(0.20, 0.30, 7, 0.15);
 
-        milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
+        Product milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
                 LocalDate.now().plusDays(5), 10); // 5 days triggers discount
-        bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
+        Product bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
                 LocalDate.now().plusDays(3), 15);
-        soap = new Product(3, "Soap", 3.0, ProductCategory.NON_FOOD,
+        Product soap = new Product(3, "Soap", 3.0, ProductCategory.NON_FOOD,
                 LocalDate.now().plusDays(365), 20);
 
         store.addProduct(milk);

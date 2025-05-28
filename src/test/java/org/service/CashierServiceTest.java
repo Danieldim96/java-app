@@ -8,15 +8,13 @@ import static org.junit.jupiter.api.Assertions.*;
 
 class CashierServiceTest {
     private CashierService cashierService;
-    private Cashier john;
-    private Cashier jane;
 
     @BeforeEach
     void setUp() {
         cashierService = new CashierServiceImpl();
 
-        john = new Cashier(1, "John Doe", 1500.0);
-        jane = new Cashier(2, "Jane Smith", 1600.0);
+        Cashier john = new Cashier(1, "John Doe", 1500.0);
+        Cashier jane = new Cashier(2, "Jane Smith", 1600.0);
 
         cashierService.addCashier(john);
         cashierService.addCashier(jane);

@@ -20,24 +20,21 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 public class StoreServiceTest {
     private StoreService store;
-    private Product milk;
-    private Product bread;
-    private Cashier john;
 
     @BeforeEach
     void setUp() {
         Receipt.resetReceiptCounter();
         store = new StoreServiceImpl(0.20, 0.30, 7, 0.15);
-        
-        milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD, 
-            LocalDate.now().plusDays(10), 10);
-        bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD, 
-            LocalDate.now().plusDays(3), 15);
+
+        Product milk = new Product(1, "Milk", 2.0, ProductCategory.FOOD,
+                LocalDate.now().plusDays(10), 10);
+        Product bread = new Product(2, "Bread", 1.5, ProductCategory.FOOD,
+                LocalDate.now().plusDays(3), 15);
         
         store.addProduct(milk);
         store.addProduct(bread);
-        
-        john = new Cashier(1, "John Doe", 1500.0);
+
+        Cashier john = new Cashier(1, "John Doe", 1500.0);
         store.addCashier(john);
         store.assignCashierToRegister(john, 1);
     }
