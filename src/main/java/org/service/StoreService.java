@@ -1,32 +1,41 @@
 package org.service;
 
-import org.model.*;
+import org.data.Product;
+import org.data.Cashier;
+import org.data.Receipt;
 import org.exception.InsufficientQuantityException;
 
 import java.util.List;
 import java.util.Map;
 
 public interface StoreService {
-    
+
+    // Product management
     void addProduct(Product product);
+
     List<Product> getDeliveredProducts();
-    List<Product> getSoldProducts();
-    
+
+    // Cashier management
     void addCashier(Cashier cashier);
-    void assignCashierToRegister(Cashier cashier, int registerNumber);
+
     List<Cashier> getCashiers();
-    
-    double calculateSellingPrice(Product product);
-    
-    Receipt createSale(int registerNumber, Map<Integer, Integer> productQuantities) 
+
+    void assignCashierToRegister(Cashier cashier, int registerNumber);
+
+    // Sales operations
+    Receipt createSale(int registerNumber, Map<Integer, Integer> purchase)
             throws InsufficientQuantityException;
-    
-    List<Receipt> getReceipts();
-    int getTotalReceipts();
+
+    // Financial reporting
     double getTotalRevenue();
-    
+
     double getSalaryExpenses();
+
     double getDeliveryExpenses();
+
     double getIncome();
+
     double getProfit();
-} 
+
+    int getTotalReceipts();
+}

@@ -1,155 +1,128 @@
 package org.service.impl;
 
-import org.model.*;
+import org.data.Product;
+import org.data.Cashier;
+import org.data.Receipt;
+import org.data.ProductCategory;
 import org.service.StoreService;
+import org.service.ProductService;
+import org.service.CashierService;
+import org.service.ReceiptService;
 import org.exception.InsufficientQuantityException;
 
-import java.io.File;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.*;
 
 public class StoreServiceImpl implements StoreService {
-    private static final String OUTPUT_DIR = "output/receipts";
+    private final ProductService productService;
+    private final CashierService cashierService;
+    private final ReceiptService receiptService;
+    private final double foodMarkup;
+    private final double nonFoodMarkup;
+    private final Map<Integer, Cashier> registerAssignments;
 
-    private Map<Integer, Product> products;
-    private List<Product> soldProducts;
-    private List<Cashier> cashiers;
-    private Map<Integer, Cashier> registerAssignments;
-    private List<Receipt> receipts;
-    private double foodMarkupPercentage;
-    private double nonFoodMarkupPercentage;
-    private int expirationDaysThreshold;
-    private double expirationDiscountPercentage;
-
-    public StoreServiceImpl(double foodMarkupPercentage, double nonFoodMarkupPercentage,
-            int expirationDaysThreshold, double expirationDiscountPercentage) {
-        this.products = new HashMap<>();
-        this.soldProducts = new ArrayList<>();
-        this.cashiers = new ArrayList<>();
+    public StoreServiceImpl(double foodMarkup, double nonFoodMarkup,
+            int expirationThreshold, double expirationDiscount) {
+        this.productService = new ProductServiceImpl(expirationThreshold, expirationDiscount);
+        this.cashierService = new CashierServiceImpl();
+        this.receiptService = new ReceiptServiceImpl();
+        this.foodMarkup = foodMarkup;
+        this.nonFoodMarkup = nonFoodMarkup;
         this.registerAssignments = new HashMap<>();
-        this.receipts = new ArrayList<>();
-        this.foodMarkupPercentage = foodMarkupPercentage;
-        this.nonFoodMarkupPercentage = nonFoodMarkupPercentage;
-        this.expirationDaysThreshold = expirationDaysThreshold;
-        this.expirationDiscountPercentage = expirationDiscountPercentage;
-
-        createOutputDirectory();
     }
 
     @Override
     public void addProduct(Product product) {
-        products.put(product.getId(), product);
+        productService.addProduct(product);
+    }
+
+    @Override
+    public List<Product> getDeliveredProducts() {
+        return productService.getAllProducts();
     }
 
     @Override
     public void addCashier(Cashier cashier) {
-        cashiers.add(cashier);
+        cashierService.addCashier(cashier);
+    }
+
+    @Override
+    public List<Cashier> getCashiers() {
+        return cashierService.getAllCashiers();
     }
 
     @Override
     public void assignCashierToRegister(Cashier cashier, int registerNumber) {
         if (registerAssignments.containsKey(registerNumber)) {
-            throw new IllegalStateException("Register " + registerNumber + " is already assigned");
+            throw new IllegalStateException("Register " + registerNumber + " is already assigned to a cashier");
         }
-        cashier.setRegisterNumber(registerNumber);
+        cashierService.assignCashierToRegister(cashier.getId(), registerNumber);
         registerAssignments.put(registerNumber, cashier);
     }
 
     @Override
-    public double calculateSellingPrice(Product product) {
-        if (product.isExpired()) {
-            throw new IllegalStateException("Cannot sell expired product: " + product.getName());
-        }
-
-        double markup = product.getCategory() == ProductCategory.FOOD ? foodMarkupPercentage : nonFoodMarkupPercentage;
-
-        double price = product.getDeliveryPrice() * (1 + markup / 100);
-
-        if (product.isNearExpiration(expirationDaysThreshold)) {
-            price *= (1 - expirationDiscountPercentage / 100);
-        }
-
-        return price;
-    }
-
-    @Override
-    public Receipt createSale(int registerNumber, Map<Integer, Integer> productQuantities)
+    public Receipt createSale(int registerNumber, Map<Integer, Integer> purchase)
             throws InsufficientQuantityException {
+        // Validate register assignment
         Cashier cashier = registerAssignments.get(registerNumber);
         if (cashier == null) {
             throw new IllegalStateException("No cashier assigned to register " + registerNumber);
         }
 
-        Receipt receipt = new Receipt(cashier);
-
-        for (Map.Entry<Integer, Integer> entry : productQuantities.entrySet()) {
-            Product product = products.get(entry.getKey());
+        // Validate quantities
+        for (Map.Entry<Integer, Integer> entry : purchase.entrySet()) {
+            Product product = productService.getProduct(entry.getKey());
             if (product == null) {
                 throw new IllegalArgumentException("Product not found: " + entry.getKey());
             }
-
-            int requestedQuantity = entry.getValue();
-            if (product.getQuantity() < requestedQuantity) {
-                throw new InsufficientQuantityException(product, requestedQuantity);
+            if (product.getExpirationDate().isBefore(java.time.LocalDate.now())) {
+                throw new IllegalStateException("Cannot sell expired product: " + product.getName());
             }
-
-            double sellingPrice = calculateSellingPrice(product);
-            receipt.addItem(product, requestedQuantity, sellingPrice);
-            product.setQuantity(product.getQuantity() - requestedQuantity);
-            soldProducts.add(new Product(product.getId(), product.getName(), product.getDeliveryPrice(),
-                    product.getCategory(), product.getExpirationDate(), requestedQuantity));
+            if (product.getQuantity() < entry.getValue()) {
+                throw new InsufficientQuantityException(product, entry.getValue());
+            }
         }
 
-        saveReceiptToFile(receipt);
-        saveReceiptSerialized(receipt);
-        receipts.add(receipt);
+        // Calculate total and update inventory
+        double totalAmount = 0;
+        Map<Product, Integer> soldItems = new HashMap<>();
 
-        return receipt;
-    }
+        for (Map.Entry<Integer, Integer> entry : purchase.entrySet()) {
+            Product product = productService.getProduct(entry.getKey());
+            int quantity = entry.getValue();
 
-    @Override
-    public List<Receipt> getReceipts() {
-        return new ArrayList<>(receipts);
-    }
+            // Calculate price with appropriate markup
+            double markup = product.getCategory() == ProductCategory.FOOD ? foodMarkup : nonFoodMarkup;
+            double price = productService.calculateSellingPrice(product.getId(), markup);
 
-    @Override
-    public int getTotalReceipts() {
-        return Receipt.getTotalReceipts();
+            totalAmount += price * quantity;
+            soldItems.put(product, quantity);
+
+            // Update inventory
+            productService.updateProductQuantity(
+                    product.getId(),
+                    product.getQuantity() - quantity);
+        }
+
+        // Create and save receipt
+        return receiptService.createReceipt(cashier, registerNumber, soldItems, totalAmount);
     }
 
     @Override
     public double getTotalRevenue() {
-        return Receipt.getTotalRevenue();
-    }
-
-    @Override
-    public List<Product> getDeliveredProducts() {
-        return new ArrayList<>(products.values());
-    }
-
-    @Override
-    public List<Product> getSoldProducts() {
-        return new ArrayList<>(soldProducts);
-    }
-
-    @Override
-    public List<Cashier> getCashiers() {
-        return new ArrayList<>(cashiers);
+        return receiptService.getTotalRevenue();
     }
 
     @Override
     public double getSalaryExpenses() {
-        return cashiers.stream().mapToDouble(Cashier::getMonthlySalary).sum();
+        return cashierService.getTotalSalaryExpenses();
     }
 
     @Override
     public double getDeliveryExpenses() {
-        return products.values().stream().mapToDouble(p -> p.getDeliveryPrice() * p.getQuantity()).sum()
-                + soldProducts.stream().mapToDouble(p -> p.getDeliveryPrice() * p.getQuantity()).sum();
+        if (productService instanceof ProductServiceImpl) {
+            return ((ProductServiceImpl) productService).getTotalDeliveryExpenses();
+        }
+        return 0.0;
     }
 
     @Override
@@ -159,35 +132,34 @@ public class StoreServiceImpl implements StoreService {
 
     @Override
     public double getProfit() {
-        return getIncome() - getSalaryExpenses() - getDeliveryExpenses();
+        return getIncome() - getSalaryExpenses();
     }
 
-    private void createOutputDirectory() {
-        try {
-            Path outputPath = Paths.get(OUTPUT_DIR);
-            if (!Files.exists(outputPath)) {
-                Files.createDirectories(outputPath);
-            }
-        } catch (IOException e) {
-            System.err.println("Error creating output directory: " + e.getMessage());
-        }
+    @Override
+    public int getTotalReceipts() {
+        return receiptService.getTotalReceipts();
     }
 
-    private void saveReceiptToFile(Receipt receipt) {
-        String fileName = OUTPUT_DIR + File.separator + "receipt_" + receipt.getReceiptNumber() + ".txt";
-        try (FileWriter writer = new FileWriter(fileName)) {
-            writer.write(receipt.generateReceiptText());
-        } catch (IOException e) {
-            System.err.println("Error saving receipt to file: " + e.getMessage());
+    public double calculateSellingPrice(int productId, double markup) {
+        Product product = productService.getProduct(productId);
+        if (product == null) {
+            throw new IllegalArgumentException("Product not found: " + productId);
         }
+
+        double basePrice = product.getDeliveryPrice();
+        double sellingPrice = basePrice * (1 + markup);
+
+        // Apply expiration discount if needed
+        if (product.isNearExpiration(7)) { // Using 7 days as threshold
+            sellingPrice *= (1 - 0.15); // 15% discount
+        }
+
+        return sellingPrice;
     }
 
-    private void saveReceiptSerialized(Receipt receipt) {
-        String fileName = OUTPUT_DIR + File.separator + "receipt_" + receipt.getReceiptNumber() + ".ser";
-        try {
-            receipt.serializeToFile(fileName);
-        } catch (IOException e) {
-            System.err.println("Error serializing receipt: " + e.getMessage());
-        }
+    // Load a receipt from file by its number
+    public Receipt loadReceiptFromFile(int receiptNumber) throws Exception {
+        String filePath = "output/receipts/receipt_" + receiptNumber + ".ser";
+        return Receipt.deserializeFromFile(filePath);
     }
 }

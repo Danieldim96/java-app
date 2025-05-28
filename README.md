@@ -105,7 +105,7 @@ README.md - This file
 - Receipts are saved in two formats in the `output/receipts/` directory:
   - Text files (`receipt_N.txt`) for human-readable format
   - Serialized files (`receipt_N.ser`) for object persistence
-- Receipts can be deserialized and read from files
+- Receipts can be deserialized (loaded) and read from files
 - The output directory is automatically created if it doesn't exist
 - Each receipt contains:
   - Unique receipt number
@@ -113,6 +113,7 @@ README.md - This file
   - Cashier information
   - List of purchased items
   - Total amount
+- Receipts can be loaded from file by their number and printed or processed again (see example below)
 
 ### Store Financial Management
 - Tracks:
@@ -148,8 +149,23 @@ The `Main` class contains an example of how to use the system:
 3. Add cashiers and assign them to registers
 4. Process sales and generate receipts
 5. View financial reports (expenses, income, profit)
+6. **Load and print a receipt from file** (demonstrates deserialization):
 
-Receipts are automatically saved to files in the `output/receipts/` directory with names like `receipt_1.txt` and `receipt_1.ser`. The output directory is gitignored to keep generated files out of version control.
+   After a sale, the following code is executed in `Main`:
+
+   ```java
+   if (store instanceof org.service.impl.StoreServiceImpl) {
+       try {
+           Receipt loaded = ((org.service.impl.StoreServiceImpl) store).loadReceiptFromFile(receipt.getReceiptNumber());
+           System.out.println("\n=== LOADED RECEIPT FROM FILE ===");
+           System.out.println(loaded);
+       } catch (Exception e) {
+           System.out.println("Failed to load receipt from file: " + e.getMessage());
+       }
+   }
+   ```
+
+   This demonstrates how you can restore and display any receipt from disk by its number.
 
 ## Testing Strategy
 

@@ -1,9 +1,10 @@
-package org.model;
+package org.data;
 
 import java.io.Serializable;
 
 public class Cashier implements Serializable {
     private static final long serialVersionUID = 1L;
+
     private int id;
     private String name;
     private double monthlySalary;
@@ -13,7 +14,7 @@ public class Cashier implements Serializable {
         this.id = id;
         this.name = name;
         this.monthlySalary = monthlySalary;
-        this.registerNumber = -1;
+        this.registerNumber = -1; // -1 indicates no register assigned
     }
 
     public int getId() {
@@ -33,16 +34,30 @@ public class Cashier implements Serializable {
     }
 
     public void setRegisterNumber(int registerNumber) {
+        if (registerNumber < 0) {
+            throw new IllegalArgumentException("Register number cannot be negative");
+        }
         this.registerNumber = registerNumber;
     }
 
     @Override
-    public String toString() {
-        return "Cashier{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", monthlySalary=" + monthlySalary +
-                ", registerNumber=" + registerNumber +
-                '}';
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        Cashier cashier = (Cashier) o;
+        return id == cashier.id;
     }
-} 
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s (ID: %d, Salary: %.2f, Register: %d)",
+                name, id, monthlySalary, registerNumber);
+    }
+}

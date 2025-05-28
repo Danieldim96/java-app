@@ -1,10 +1,11 @@
-package org.model;
+package org.data;
 
 import java.io.Serializable;
 import java.time.LocalDate;
 
 public class Product implements Serializable {
     private static final long serialVersionUID = 1L;
+
     private int id;
     private String name;
     private double deliveryPrice;
@@ -12,8 +13,8 @@ public class Product implements Serializable {
     private LocalDate expirationDate;
     private int quantity;
 
-    public Product(int id, String name, double deliveryPrice, ProductCategory category, 
-                  LocalDate expirationDate, int quantity) {
+    public Product(int id, String name, double deliveryPrice, ProductCategory category,
+            LocalDate expirationDate, int quantity) {
         this.id = id;
         this.name = name;
         this.deliveryPrice = deliveryPrice;
@@ -47,6 +48,9 @@ public class Product implements Serializable {
     }
 
     public void setQuantity(int quantity) {
+        if (quantity < 0) {
+            throw new IllegalArgumentException("Quantity cannot be negative");
+        }
         this.quantity = quantity;
     }
 
@@ -59,14 +63,23 @@ public class Product implements Serializable {
     }
 
     @Override
-    public String toString() {
-        return "Product{" +
-                "id=" + id +
-                ", name='" + name + '\'' +
-                ", deliveryPrice=" + deliveryPrice +
-                ", category=" + category +
-                ", expirationDate=" + expirationDate +
-                ", quantity=" + quantity +
-                '}';
+    public boolean equals(Object o) {
+        if (this == o)
+            return true;
+        if (o == null || getClass() != o.getClass())
+            return false;
+        Product product = (Product) o;
+        return id == product.id;
     }
-} 
+
+    @Override
+    public int hashCode() {
+        return id;
+    }
+
+    @Override
+    public String toString() {
+        return String.format("%s (ID: %d, Price: %.2f, Quantity: %d, Expires: %s)",
+                name, id, deliveryPrice, quantity, expirationDate);
+    }
+}
